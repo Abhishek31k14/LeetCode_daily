@@ -1,0 +1,31 @@
+name: Sync LeetCode
+on:
+  schedule:
+    - cron: '0 0 * * *' # Runs every day at midnight
+  workflow_dispatch: # Allows you to run it manually
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Run Sync Script
+        env:
+          LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
+          LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
+        run: python sync_leetcode.py
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "your-username"
+          git config --global user.email "your-email@example.com"
+          git add .
+          git commit -m "Auto-sync: Daily LeetCode Solutions" || exit 0
+          git push
