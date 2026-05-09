@@ -4,24 +4,30 @@ import os
 
 SESSION = os.getenv('LEETCODE_SESSION')
 CSRF_TOKEN = os.getenv('LEETCODE_CSRF_TOKEN')
+# Add your username here manually for now to test
+LEETCODE_USERNAME = "YOUR_ACTUAL_USERNAME_HERE" 
 
 def main():
-    print("--- Starting Sync ---")
-    if not SESSION or not CSRF_TOKEN:
-        print("CRITICAL: Secrets are missing!")
-        return
-
+    print("--- Starting Deep Sync ---")
     url = 'https://leetcode.com/graphql/'
-    headers = {
-        'Referer': 'https://leetcode.com/',
-        'X-CSRFToken': CSRF_TOKEN,
-        'Content-Type': 'application/json',
-    }
-    cookies = {'LEETCODE_SESSION': SESSION, 'csrftoken': CSRF_TOKEN}
     
+    # These headers are CRITICAL for LeetCode's security
+    headers = {
+        'Content-Type': 'application/json',
+        'Referer': 'https://leetcode.com/',
+        'x-csrftoken': CSRF_TOKEN,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+    }
+    
+    cookies = {
+        'LEETCODE_SESSION': SESSION,
+        'csrftoken': CSRF_TOKEN
+    }
+    
+    # We use a broader query that often works better with cookies
     query = """
-    query {
-        recentSubmissionList(username: "", limit: 5) {
+    query userRecentSubmissions($username: String!, $limit: Int!) {
+        recentSubmissionList(username: $username, limit: $limit) {
             title
             statusDisplay
             lang
@@ -29,28 +35,35 @@ def main():
     }
     """
     
+    payload = {
+        'query': query,
+        'variables': {'username': "https://leetcode.com/u/Abhishek_Kumar31/", 'limit': 10}
+    }
+    
     try:
-        r = requests.post(url, json={'query': query}, cookies=cookies, headers=headers)
-        print(f"LeetCode Response Code: {r.status_code}")
+        r = requests.post(url, json=payload, cookies=cookies, headers=headers)
+        print(f"HTTP Status: {r.status_code}")
         
         data = r.json()
+        if 'errors' in data:
+            print(f"LeetCode Error: {data['errors']}")
+            return
+
         subs = data.get('data', {}).get('recentSubmissionList', [])
         
         if not subs:
-            print("Result: No submissions found. Your LEETCODE_SESSION might be expired or incorrect.")
+            print("Result: Still no submissions found. Trying fallback...")
+            # Fallback: check if the session is actually valid by getting profile info
+            profile_query = "{ user { username } }"
+            r_profile = requests.post(url, json={'query': profile_query}, cookies=cookies, headers=headers)
+            print(f"Profile check: {r_profile.text}")
             return
 
         for s in subs:
-            print(f"Found: {s['title']} | Status: {s['statusDisplay']}")
-            if s['statusDisplay'] == 'Accepted':
-                # Create dummy file to test the push
-                filename = f"TEST_{s['title'].replace(' ', '_')}.cpp"
-                with open(filename, "w") as f:
-                    f.write("// Success")
-                print(f"Created file: {filename}")
+            print(f"FOUND: {s['title']} | {s['statusDisplay']}")
 
     except Exception as e:
-        print(f"Script Error: {e}")
+        print(f"System Error: {e}")
 
 if __name__ == "__main__":
     main()
