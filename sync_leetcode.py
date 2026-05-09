@@ -1,69 +1,86 @@
-
 import requests
 import os
+import time
 
 SESSION = os.getenv('LEETCODE_SESSION')
 CSRF_TOKEN = os.getenv('LEETCODE_CSRF_TOKEN')
-# Add your username here manually for now to test
-LEETCODE_USERNAME = "YOUR_ACTUAL_USERNAME_HERE" 
+LEETCODE_USERNAME = "Abhishek_Kumar31" 
 
 def main():
-    print("--- Starting Deep Sync ---")
+    print(f"--- Syncing for {LEETCODE_USERNAME} ---")
     url = 'https://leetcode.com/graphql/'
-    
-    # These headers are CRITICAL for LeetCode's security
     headers = {
         'Content-Type': 'application/json',
         'Referer': 'https://leetcode.com/',
         'x-csrftoken': CSRF_TOKEN,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0'
     }
-    
-    cookies = {
-        'LEETCODE_SESSION': SESSION,
-        'csrftoken': CSRF_TOKEN
-    }
-    
-    # We use a broader query that often works better with cookies
-    query = """
-    query userRecentSubmissions($username: String!, $limit: Int!) {
+    cookies = {'LEETCODE_SESSION': SESSION, 'csrftoken': CSRF_TOKEN}
+
+    # Query 1: Get the list of recent submissions
+    list_query = """
+    query recentSubmissionList($username: String!, $limit: Int!) {
         recentSubmissionList(username: $username, limit: $limit) {
             title
+            titleSlug
             statusDisplay
             lang
+            id
         }
     }
     """
     
     payload = {
-        'query': query,
-        'variables': {'username': "https://leetcode.com/u/Abhishek_Kumar31/", 'limit': 10}
+        'query': list_query,
+        'variables': {'username': LEETCODE_USERNAME, 'limit': 15}
     }
-    
+
     try:
         r = requests.post(url, json=payload, cookies=cookies, headers=headers)
-        print(f"HTTP Status: {r.status_code}")
-        
-        data = r.json()
-        if 'errors' in data:
-            print(f"LeetCode Error: {data['errors']}")
-            return
-
-        subs = data.get('data', {}).get('recentSubmissionList', [])
+        subs = r.json().get('data', {}).get('recentSubmissionList', [])
         
         if not subs:
-            print("Result: Still no submissions found. Trying fallback...")
-            # Fallback: check if the session is actually valid by getting profile info
-            profile_query = "{ user { username } }"
-            r_profile = requests.post(url, json={'query': profile_query}, cookies=cookies, headers=headers)
-            print(f"Profile check: {r_profile.text}")
+            print("No submissions found in history.")
             return
 
-        for s in subs:
-            print(f"FOUND: {s['title']} | {s['statusDisplay']}")
+        for sub in subs:
+            if sub['statusDisplay'] == 'Accepted':
+                # Map lang to file extension
+                ext = 'cpp' if 'cpp' in sub['lang'] else 'py' if 'python' in sub['lang'] else 'txt'
+                filename = f"{sub['titleSlug']}.{ext}"
+                
+                # Check if file already exists to avoid duplicate work
+                if os.path.exists(filename):
+                    continue
+
+                print(f"New Solution Found: {sub['title']}. Fetching code...")
+                
+                # Query 2: Get the actual code for this specific submission
+                detail_query = """
+                query submissionDetails($submissionId: Int!) {
+                    submissionDetails(submissionId: $submissionId) {
+                        code
+                    }
+                }
+                """
+                detail_payload = {
+                    'query': detail_query,
+                    'variables': {'submissionId': int(sub['id'])}
+                }
+                
+                r_code = requests.post(url, json=detail_payload, cookies=cookies, headers=headers)
+                full_code = r_code.json().get('data', {}).get('submissionDetails', {}).get('code', "")
+
+                if full_code:
+                    with open(filename, 'w') as f:
+                        f.write(full_code)
+                    print(f"Saved {filename}")
+                    time.sleep(1) # Delay to be safe
+
+        print("--- Sync Complete ---")
 
     except Exception as e:
-        print(f"System Error: {e}")
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
     main()
