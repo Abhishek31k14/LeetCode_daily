@@ -48,8 +48,8 @@ def main():
                 # Map lang to file extension
                 ext = 'cpp' if 'cpp' in sub['lang'] else 'py' if 'python' in sub['lang'] else 'txt'
                 # Try 'frontendQuestionId' first, then 'id', then default to '0000'
-                prob_id = sub.get('frontendQuestionId') or sub.get('id')
-                filename = f"{int(prob_id):04d}_{sub['titleSlug']}.{ext}"
+                prob_id = sub.get('frontendQuestionId') or sub.get('question', {}).get('questionFrontendId') or "0000"
+                filename = f"{prob_id}_{sub['titleSlug']}.{ext}"
                 
                 # Check if file already exists to avoid duplicate work
                 if os.path.exists(filename):
