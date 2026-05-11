@@ -47,7 +47,9 @@ def main():
             if sub['statusDisplay'] == 'Accepted':
                 # Map lang to file extension
                 ext = 'cpp' if 'cpp' in sub['lang'] else 'py' if 'python' in sub['lang'] else 'txt'
-                filename = f"{sub['questionId']:04d}_{sub['titleSlug']}.{ext}"
+                # Try 'frontendQuestionId' first, then 'id', then default to '0000'
+                prob_id = sub.get('frontendQuestionId') or sub.get('id')
+                filename = f"{int(prob_id):04d}_{sub['titleSlug']}.{ext}"
                 
                 # Check if file already exists to avoid duplicate work
                 if os.path.exists(filename):
