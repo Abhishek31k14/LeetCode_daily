@@ -2,10 +2,6 @@ import os
 import json
 import requests
 import time
-from dotenv import load_dotenv
-# Load the variables from the .env file
-load_dotenv()
-
 
 SESSION = os.getenv('LEETCODE_SESSION')
 CSRF_TOKEN = os.getenv('LEETCODE_CSRF_TOKEN')
